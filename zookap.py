@@ -8,10 +8,10 @@ import msgpack
 from kazoo.client import KazooClient
 
 
-p = argpars.ArgumentParser()
+p = argparse.ArgumentParser()
 p.add_argument('-s', '--servers', required=True,
     help='Comma-list of zookeeper server:port')
-p.add_argument('-d', '--dry-run', required=True,
+p.add_argument('-d', '--dry-run', required=False, default=False, action='store_true',
     help='')
 p.add_argument('-o', '--operation', required=True,choices=['backup', 'restore'],
     help='Whether to backup or restore')
@@ -38,18 +38,20 @@ def prepare_backup(client, start_path='/'):
             next_target.append(t + '/' + child)
 
     return targets
-        
+
 
 def backup(client, config):
     targets = prepare_backup(client, config.start_path)
     print(targets)
 
+
 def restore(client):
     pass
 
+
 def main():
-    args = p.parse_arguments()
-    zk = KazooClint(hosts=args.servers)
+    args = p.parse_args()
+    zk = KazooClient(hosts=args.servers)
     zk.start()
 
 
