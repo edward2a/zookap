@@ -53,6 +53,7 @@ def main():
     args = p.parse_args()
     zk = KazooClient(hosts=args.servers)
     zk.start()
+    backup(zk, args)
 
 
 if __name__ == '__main__':
