@@ -18,7 +18,7 @@
 
 import argparse
 import boto3
-import lz4
+import lz4.frame
 import msgpack
 
 from kazoo.client import KazooClient
@@ -47,7 +47,7 @@ def prepare_backup(client, start_path='/'):
     targets = []
     next_target = [start_path]
 
-    # do / separate to avoid duplicate // on the path
+    # do root path separate to avoid duplicate // on the child nodes
     if next_target[0] == '/':
         next_target.extend(
             client.get_children(next_target.pop()))
@@ -62,19 +62,31 @@ def prepare_backup(client, start_path='/'):
 
 
 def backup(client, config):
+    chunk_size = 131072 # 128K
     targets = prepare_backup(client, config.start_path)
     # TODO: remove print, only for development debugging
     print(targets)
 
 
+    c_ctx = lz4.frame.create_compression_context()
+    z = lz4.frame.compress_begin(c_ctx,
+        compression_level=lz4.frame.COMPRESSIONLEVEL_MINHC)
+
     with open(config.backup_target, 'w+b') as f:
-        f.write(':<date>:msgpack:lz4\n'.encode())
+        f.write(':<date>:msgpack:lz4-chunk\n'.encode())
 
-        for t in targets:
-            o = client.get(t)
+        while len(targets) > 0:
+            while len(z) < chunk_size and len(targets) > 0:
+                t = targets.pop()
+                o = client.get(t)
 
-            # Store serialised/compressed dict with node and data
-            f.write(msgpack.packb({'n': t, 'd': o[0]}) + b'\n')
+                # Store serialised/compressed dict with node and data
+                z += lz4.frame.compress_chunk(c_ctx, msgpack.packb(
+                    {'n': t, 'd': o[0]}) + b'\n')
+
+            else:
+                z += lz4.frame.compress_flush(c_ctx)
+                f.write(z)
 
     return True
 
@@ -87,6 +99,7 @@ def main():
     args = p.parse_args()
     zk = KazooClient(hosts=args.servers)
     zk.start()
+
     backup(zk, args)
 
 
