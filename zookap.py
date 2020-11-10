@@ -29,10 +29,15 @@ p.add_argument('-s', '--servers', required=True,
     help='Comma-list of zookeeper server:port')
 p.add_argument('-d', '--dry-run', required=False, default=False, action='store_true',
     help='')
-p.add_argument('-o', '--operation', required=True,choices=['backup', 'restore'],
-    help='Whether to backup or restore')
+# TODO: operation will be a subparser, leaving this code to remember
+#p.add_argument('-o', '--operation', required=True,choices=['backup', 'restore'],
+#    help='Whether to backup or restore')
 p.add_argument('--start-path', required=False, default='/',
     help='The path from where to start the backup')
+
+# backup options
+p.add_argument('-t', '--backup-target', required=False, default='zoo-snap.mpk.lz4',
+    help='The output file for the backup')
 
 # restore options (TODO: subparser)
 # differential restore: restore only missing
@@ -58,7 +63,20 @@ def prepare_backup(client, start_path='/'):
 
 def backup(client, config):
     targets = prepare_backup(client, config.start_path)
+    # TODO: remove print, only for development debugging
     print(targets)
+
+
+    with open(config.backup_target, 'w+b') as f:
+        f.write(':<date>:msgpack:lz4\n'.encode())
+
+        for t in targets:
+            o = client.get(t)
+
+            # Store serialised/compressed dict with node and data
+            f.write(msgpack.packb({'n': t, 'd': o[0]}) + b'\n')
+
+    return True
 
 
 def restore(client):
