@@ -85,8 +85,10 @@ def backup(client, config):
                     {'n': t, 'd': o[0]}) + b'\n')
 
             else:
-                z += lz4.frame.compress_flush(c_ctx)
+                z += lz4.frame.compress_flush(c_ctx, end_frame=False)
                 f.write(z)
+
+        f.write(lz4.frame.compress_flush(c_ctx))
 
     return True
 
